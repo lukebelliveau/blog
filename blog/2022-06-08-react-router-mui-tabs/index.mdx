@@ -1,0 +1,367 @@
+---
+slug: react-router-v6-breadcrumbs
+title: Handling Active Tabs With MaterialUI & React Router v6
+authors: [lukebelliveau]
+tags: [react-router, react-router-v6]
+---
+
+While working on a migration to [React Router v6](https://reactrouter.com/docs/en/v6) recently, I hit a snag while trying to take advantage of the much-improved
+[nested routes](https://reactrouter.com/docs/en/v6/getting-started/tutorial#nested-routes) feature. This was in an application using [MaterialUI](https://mui.com/), with a top-level
+layout component presenting MUI Tabs to the user.
+
+### The v5 way
+
+Before the v6-style nested layouts, I was passing the tab route to a `TabbedLayout` component as a URL Parameter via [dynamic segments](https://reactrouter.com/docs/en/v6/getting-started/concepts#dynamic-segment)
+(see `:selectedTab` in `App.tsx` below). The `TabbedLayout` component
+was in charge of rendering the layout, and choosing which tab content component to render. As you can see, it's convenient to provide the `:selectedTab` parameter to
+`TabbedLayout`, as it needs to know which tab is currently selected so it can highlight the correct tab:
+
+<SandpackSnippet dependencies={{
+  "react-router-dom": "latest",
+  "@mui/material": "latest",
+  "@emotion/styled": "latest",
+  "@emotion/react": "latest",
+}}>
+
+```tsx Layout.tsx
+export default ({ children }: { children: JSX.Element }) => {
+  return (
+    <>
+      <h4>I'm the Layout</h4>
+      <div
+        style={{
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          border: "1px solid black",
+        }}
+      >
+        {children}
+      </div>
+    </>
+  );
+};
+```
+
+```tsx TabbedLayout.tsx
+import { useParams, Link } from "react-router-dom";
+import { Tab, Tabs } from "@mui/material";
+import Layout from "./Layout";
+
+const Tab1Content = () => <div>Tab 1 Content</div>;
+const Tab2Content = () => <div>Tab 2 Content</div>;
+const Tab3Content = () => <div>Tab 3 Content</div>;
+
+export const tabs = {
+  TAB1: { label: "Tab 1", path: "tab1", component: Tab1Content },
+  TAB2: { label: "Tab 2", path: "tab2", component: Tab2Content },
+  TAB3: { label: "Tab 3", path: "tab3", component: Tab3Content },
+};
+
+const TabbedLayout = () => {
+  const tabPaths = Object.values(tabs).map((tab) => tab.path);
+  const { selectedTab } = useParams();
+
+  let TabContent = Tab1Content;
+  if (selectedTab === "tab2") TabContent = Tab2Content;
+  if (selectedTab === "tab3") TabContent = Tab3Content;
+
+  return (
+    <>
+      <Tabs value={selectedTab}>
+        <Tab
+          label={tabs.TAB1.label}
+          value={tabs.TAB1.path}
+          to={"/" + tabs.TAB1.path}
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB2.label}
+          value={tabs.TAB2.path}
+          to={"/" + tabs.TAB2.path}
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB3.label}
+          value={tabs.TAB3.path}
+          to={"/" + tabs.TAB3.path}
+          component={Link}
+        />
+      </Tabs>
+      <Layout>
+        <TabContent />
+      </Layout>
+    </>
+  );
+};
+
+export default TabbedLayout;
+```
+
+```tsx App.tsx active
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useState } from "react";
+import TabbedLayout, { tabs } from "./TabbedLayout";
+
+export default function App() {
+  return (
+    <BrowserRouter initialEntries={["tab1"]}>
+      <Routes>
+        <Route index element={<Navigate to={"tab1"} replace />} />
+        <Route path="/:selectedTab" element={<TabbedLayout />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+```
+
+</SandpackSnippet>
+
+<!--truncate-->
+
+### React Router v6: all together, now
+
+I wanted to take full advantage of the v6-style nested routes,
+such that every single route a user
+could navigate to could be represented in one route layout:
+
+```tsx
+<BrowserRouter>
+  <Routes>
+    <Route path="/*" element={<TabbedLayout />}>
+      <Route path="tab1" element={<Tab1Content />} />
+      <Route path="tab2" element={<Tab2Content />} />
+      <Route path="tab3" element={<Tab3Content />} />
+    </Route>
+  </Routes>
+</BrowserRouter>
+```
+
+This is great - we still get our `TabbedLayout` component handling our
+layout/tabs around all of our Content components, and we don't even have to handle the
+rendering logic for the Content components anymore. React Router will do that for us!
+
+While React Router will handle the rendering of our content components automatically, we still need our
+`TabbedLayout` component to be aware of which tab route (`tab1`, `tab2`, or `tab3`) is currently active, so it can highlight it.
+
+There's only one problem - the `TabbedLayout` component is rendered higher up in the
+route tree than the tab selection routes (like `<Route path="tab1" element={<Tab1Content />} />`)
+
+Of course, we could just pass the `:selectedTab` URL param as we did in the example above. But - I want to use these nested routes!
+
+Basically, I have a component at a parent route (`TabbedLayout` at route `"/*`)
+that needs to know if its child routes are active or not. I started by manually parsing the
+`location` object returned from React Router's `useLocation` hook, but this felt a bit hacky.
+There is a better way!
+
+_Note: this is a special case as we're using MUI's Tab components. If you just need a Link
+to know if it's currently active or not, check out React Router's [`NavLink`](https://reactrouter.com/docs/en/v6/components/nav-link) component._
+
+## `useMatch` to the rescue!
+
+It turns out you can use React Router's `useMatch` hook to see if the location we are currently at
+matches a given path. Here's a crude use of it to determine which child route we're at, if any:
+
+```tsx
+const useSelectedTab = () => {
+  const isTab1 = useMatch("/tab1");
+  const isTab2 = useMatch("/tab2");
+  const isTab3 = useMatch("/tab3");
+
+  if (isTab1) return "tab1";
+  else if (isTab2) return "tab2";
+  else if (isTab3) return "tab3";
+
+  return "tab1";
+};
+
+const TabbedLayout = () => {
+  const selectedTab = useSelectedTab();
+
+  return (
+    <Fragment>
+      <Tabs value={selectedTab}>
+        <Tab
+          label={tabs.TAB1.label}
+          value={tabs.TAB1.path}
+          to="tab1"
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB2.label}
+          value={tabs.TAB2.path}
+          to="tab2"
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB3.label}
+          value={tabs.TAB3.path}
+          to="tab3"
+          component={Link}
+        />
+      </Tabs>
+      <Layout>
+        {/* This Outlet will render the TabContent as a child route */}
+        <Outlet />
+      </Layout>
+    </Fragment>
+  );
+};
+```
+
+With a tiny wrapper function around the `useMatch` hook, we can make this a bit more concise:
+
+```tsx
+function useRouteMatch(patterns: readonly string[]) {
+  const { pathname } = useLocation();
+
+  for (let i = 0; i < patterns.length; i += 1) {
+    const pattern = patterns[i];
+    const possibleMatch = matchPath(pattern, pathname);
+    if (possibleMatch !== null) {
+      return possibleMatch.pattern.path;
+    }
+  }
+
+  // default to `tab1`
+  return 'tab1';
+}
+
+
+const TabbedLayout = () => {
+  const selectedTab = useRouteMatch(['tab1', 'tab2', 'tab3']);
+
+  return (
+    <Fragment>
+      <Tabs value={selectedTab.pattern.path}>
+        { // ... }
+    </Fragment>
+  );
+};
+```
+
+When taken all together, this pattern can make it really easy to group your components
+with their paths and get the router to do the work for you. Play around with it here:
+
+<SandpackSnippet
+  dependencies={{
+    "react-router-dom": "latest",
+    "@mui/material": "latest",
+    "@emotion/styled": "latest",
+    "@emotion/react": "latest",
+  }}
+>
+
+```tsx Layout.tsx
+export default ({ children }: { children: JSX.Element }) => {
+  return (
+    <>
+      <h4>I'm the Layout</h4>
+      <div
+        style={{
+          height: "100%",
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          border: "1px solid black",
+        }}
+      >
+        {children}
+      </div>
+    </>
+  );
+};
+```
+
+```tsx
+import * as React from "react";
+import { Fragment } from "react";
+import { Tab, Tabs } from "@mui/material";
+import {
+  Link,
+  matchPath,
+  Outlet,
+  useLocation,
+  BrowserRouter,
+  Route,
+  Routes,
+  Navigate,
+} from "react-router-dom";
+import Layout from "./Layout";
+
+const Tab1Content = () => <div>Tab 1 Content</div>;
+const Tab2Content = () => <div>Tab 2 Content</div>;
+const Tab3Content = () => <div>Tab 3 Content</div>;
+
+export const tabs = {
+  TAB1: { label: "Tab 1", path: "tab1", component: Tab1Content },
+  TAB2: { label: "Tab 2", path: "tab2", component: Tab2Content },
+  TAB3: { label: "Tab 3", path: "tab3", component: Tab3Content },
+};
+
+function useRouteMatch(patterns: readonly string[]) {
+  const { pathname } = useLocation();
+
+  for (let i = 0; i < patterns.length; i += 1) {
+    const pattern = patterns[i];
+    const possibleMatch = matchPath(pattern, pathname);
+    if (possibleMatch !== null) {
+      return possibleMatch.pattern.path;
+    }
+  }
+
+  return "tab1";
+}
+
+const TabbedLayout = () => {
+  const tabPaths = Object.values(tabs).map((tab) => tab.path);
+  const selectedTab = useRouteMatch(tabPaths);
+
+  return (
+    <Fragment>
+      <Tabs value={selectedTab}>
+        <Tab
+          label={tabs.TAB1.label}
+          value={tabs.TAB1.path}
+          to={tabs.TAB1.path}
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB2.label}
+          value={tabs.TAB2.path}
+          to={tabs.TAB2.path}
+          component={Link}
+        />
+        <Tab
+          label={tabs.TAB3.label}
+          value={tabs.TAB3.path}
+          to={tabs.TAB3.path}
+          component={Link}
+        />
+      </Tabs>
+      {/* This Outlet will render the TabContent as a child route */}
+      <Layout>
+        <Outlet />
+      </Layout>
+    </Fragment>
+  );
+};
+
+export default () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/*" element={<TabbedLayout />}>
+          <Route index element={<Navigate to={"tab1"} replace />} />
+          <Route path={tabs.TAB1.path} element={<tabs.TAB1.component />} />
+          <Route path={tabs.TAB2.path} element={<tabs.TAB2.component />} />
+          <Route path={tabs.TAB3.path} element={<tabs.TAB3.component />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+};
+```
+
+</SandpackSnippet>
