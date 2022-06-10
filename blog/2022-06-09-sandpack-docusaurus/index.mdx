@@ -2,15 +2,17 @@
 slug: sandpack-docusaurus
 title: Live Code Previews in Docusaurus
 authors: [lukebelliveau]
-tags: [react-router, react-router, material-ui, react]
+tags: [react, docusaurus, code-sandbox, sandpack]
 ---
 
+_note: after writing this, I found a more robust explanation done by Juwon Owoseni at LogRocket. you can read that [here](https://blog.logrocket.com/build-interactive-blog-with-react-sandpack/)!_
+
 In my experience, the primary reason to start a programming blog is to introduce
-yourself to a handful of new technical problems, get frustrated, and forget about
+yourself to a handful of new technical problems, solve some of them, then forget about
 the blog in about a week. Before I forget about this blog, I'm gonna show you
 how to do this:
 
-<SandpackSnippet>
+<SandpackEditor>
 
 ```tsx
 export default () => {
@@ -23,12 +25,14 @@ export default () => {
 };
 ```
 
-</SandpackSnippet>
+</SandpackEditor>
 
-By writing markdown like this:
+<br />
+
+By writing markdown (technically `.mdx`) like this:
 
 ````jsx
-<SandpackSnippet>
+<SandpackEditor>
 
 ```tsx
 export default () => {
@@ -41,5 +45,263 @@ export default () => {
 };
 ```
 
-</SandpackSnippet>
+</SandpackEditor>
 ````
+
+<!--truncate-->
+
+### Inspiration & Alternatives
+
+It's important to me that the markdown files I write these blogs in are
+relatively portable - ideally if I get sick of Docusaurus, I can copy the very
+[`.mdx`](https://mdxjs.com/) file I'm writing in now, and take it somewhere else. This ruled out the approach I see in a lot of places,
+where blogs will render an `iframe` to embed a code editor hosted on StackBlitz, CodeSandbox, or somewhere else (like this):
+
+```jsx
+<iframe
+  src="https://stackblitz.com/edit/react-ts-ktczzd?embed=1&file=App.tsx"
+  width="100%"
+  height="400px"
+/>
+```
+
+<iframe
+  src="https://stackblitz.com/edit/react-ts-ktczzd?embed=1&file=App.tsx"
+  width="100%"
+  height="400px"
+/>
+
+I've more or less achieved this, as long as CodeSandbox (the makers of Sandpack) don't disappear any time soon.
+
+While it's true that the Sandpack editor won't show up without a connection to CodeSandbox servers, I get to keep all of the code with me, living in or alongside
+the markdown files.
+
+This approach was inspired by the ReactJS docs. (At this time of writing they're
+the beta docs for Hooks, with loads of interactive examples)
+
+### Enter the Sandpack
+
+[Sandpack](https://sandpack.codesandbox.io/) is a library by
+[CodeSandbox](https://codesandbox.io/). It provides some React components to render
+an editable sandbox right in the browser. Using the basic sandbox component, you can
+get something like this with barely any code:
+
+<SandpackEditor dependencies={{
+  "@codesandbox/sandpack-react": "latest"
+}}>
+
+```tsx
+import { Sandpack } from "@codesandbox/sandpack-react";
+
+export default () => <Sandpack template="react-ts" />;
+```
+
+</SandpackEditor>
+
+_The left pane loads Sandpack, the top-right pane is the editor_ loaded by _Sandpack, the bottom right pane is output of the Sandpack editor. Play around!_
+
+Sandbox offers loads of great customization options, which you can read about in the [docs](https://sandpack.codesandbox.io/docs/getting-started/install).
+One thing they don't offer out-of-the-box is a way to pass a Markdown code block
+as a child, and render them as files, as shown above.
+
+Here, I'll show you how to do this.
+You can even create multiple files as children, and have them editable as such:
+
+````jsx
+<SandpackEditor>
+
+```tsx Index.tsx active
+import App from './App'
+
+export default () => {
+  return (
+    <div>
+      <h1>Hello World</h1>
+      <p>Play with me!</p>
+    </div>
+  );
+};
+```
+
+```tsx App.tsx
+const App = () => {
+  return <div>I'm the app, but I'm in a different file!</div>
+}
+```
+
+</SandpackEditor>
+````
+
+renders as:
+
+<SandpackEditor>
+
+```tsx Index.tsx active
+import App from "./App";
+
+export default () => {
+  return <App />;
+};
+```
+
+```tsx App.tsx
+const App = () => {
+  return <div>I'm the App component, but I'm in a different file!</div>;
+};
+
+export default App;
+```
+
+</SandpackEditor>
+
+### Creating our `SandpackEditor` component
+
+We will extend the baseline `Sandpack` component to work for this use case.
+I want our custom component to do two things:
+
+- Accept a string of children "component files", except instead of real files they're markdown code blocks
+- Understand what dependencies are needed to run the snippet, so `Sandpack` can download the dependencies on a per-example basis
+
+This requires some nontrivial knowledge about MDX & React elements, along with what I assume was a fair bit of trial & error.
+Thankfully, the folks working on the ReactJS docs figured this out first, so I didn't have to. Here's what our `SandpackEditor`
+component looks like:
+
+```jsx
+import { Sandpack } from "@codesandbox/sandpack-react";
+import { createFileMap } from "./createFileMap";
+
+const SandpackEditor = ({
+  children,
+  dependencies = {},
+}: {
+  children: JSX.Element,
+  dependencies: { [key: string]: string },
+}) => {
+  const files = createFileMap(children);
+
+  return (
+    <Sandpack
+      template="react-ts"
+      files={files}
+      options={{
+        showNavigator: true,
+      }}
+      customSetup={{
+        dependencies,
+      }}
+    />
+  );
+};
+```
+
+Pretty simple, right? There's a fair bit of magic going on in that `createFileMap` function, which
+I unceremoniously stole from the [ReactJS docs repo on Github](https://github.com/reactjs/reactjs.org).
+
+I'll let you parse the code, but here's the gist of it:
+
+- convert the `children` JSX element to an array of children
+- from this array, create an object keyed on the filename, with the values holding other properties (like the code, and if the file is active/hidden)
+
+The output of this function is an object ready to be passed as the Sandpack [`files` prop](https://sandpack.codesandbox.io/docs/api/react/interfaces/SandpackProps#files). Cool!
+
+```tsx
+import type { SandpackFile } from "@codesandbox/sandpack-react";
+
+export const createFileMap = (
+  children: JSX.Element
+): Record<string, SandpackFile> => {
+  let codeSnippets = React.Children.toArray(children) as React.ReactElement[];
+
+  return codeSnippets.reduce(
+    (result: Record<string, SandpackFile>, codeSnippet: React.ReactElement) => {
+      if (codeSnippet.props.mdxType !== "pre") {
+        return result;
+      }
+      const { props } = codeSnippet.props.children;
+      let filePath; // path in the folder structure
+      let fileHidden = false; // if the file is available as a tab
+      let fileActive = false; // if the file tab is shown by default
+
+      if (props.metastring) {
+        const [name, ...params] = props.metastring.split(" ");
+        filePath = "/" + name;
+        if (params.includes("hidden")) {
+          fileHidden = true;
+        }
+        if (params.includes("active")) {
+          fileActive = true;
+        }
+      } else {
+        if (props.className === "language-js") {
+          filePath = "/App.js";
+        } else if (props.className === "language-ts") {
+          filePath = "/App.tsx";
+        } else if (props.className === "language-tsx") {
+          filePath = "/App.tsx";
+        } else if (props.className === "language-css") {
+          filePath = "/styles.css";
+        } else {
+          throw new Error(
+            `Code block is missing a filename: ${props.children}`
+          );
+        }
+      }
+      if (result[filePath]) {
+        throw new Error(
+          `File ${filePath} was defined multiple times. Each file snippet should have a unique path name`
+        );
+      }
+      result[filePath] = {
+        code: props.children as string,
+        hidden: fileHidden,
+        active: fileActive,
+      };
+
+      return result;
+    },
+    {}
+  );
+};
+```
+
+We now have a `SandpackEditor` component that's ready to be dropped into our
+`.mdx` files. Sweet. Last step: add it to Docusaurus!
+
+### Add to Docusaurus
+
+[Docusaurus](https://docusaurus.io/) is a popular static-site generator for generating
+documentation and blogs. I chose it because it is the first piece of blog-generation technology
+that hasn't made me quit in frustration before I started writing. Seriously, it's pretty great.
+
+Anyway, the default generator for Docusaurus will create many folders, one of them
+`src/components`. Put your new component in there. I did it like this:
+
+```
+.
+└── src/
+    └── components/
+        └── SandpackEditor/
+            ├── SandpackEditor.tsx
+            └── createFileMap.ts
+```
+
+Now, we're going to add our component to Docusaurus' global scope so we can
+drop it into any of our `.mdx` files without any import statements. you can read more about Docusaurus MDX global scope [here](https://docusaurus.io/docs/next/markdown-features/react#mdx-component-scope).
+
+You may or may not have a file at `/src/theme/MDXComponents.js` (I didn't). If you don't create one, and make it look like this:
+
+```js
+// Import the original mapper
+import MDXComponents from "@theme-original/MDXComponents";
+import SandpackEditor from "@site/src/components/SandpackEditor/SandpackEditor";
+
+export default {
+  // Re-use the default mapping
+  ...MDXComponents,
+  // Map the "SandpackEditor" tag to our <SandpackEditor /> component!
+  // `SandpackEditor` will receive all props that were passed to `SandpackEditor` in MDX
+  SandpackEditor: SandpackEditor,
+};
+```
+
+Voila! If all goes well, you should be able to use `.mdx` files with your new `<SandpackEditor />` component, just like [this very file does](https://raw.githubusercontent.com/lukebelliveau/blog/main/blog/2022-06-09-sandpack-docusaurus/index.mdx)!

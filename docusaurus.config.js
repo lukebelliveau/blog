@@ -6,9 +6,9 @@ const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "My Site",
+  title: "Luke's dev blog",
   tagline: "Dinosaurs are cool",
-  url: "https://your-docusaurus-test-site.com",
+  url: "https://lukebelliveau.dev",
   baseUrl: "/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
@@ -55,19 +55,19 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: "My Site",
+        title: "Luke's dev blog",
         logo: {
-          alt: "My Site Logo",
-          src: "img/logo.svg",
+          alt: "Penrose Triangle as logo",
+          src: "img/logo.png",
         },
-        // items: [
-        //   { to: "/blog", label: "Blog", position: "left" },
-        //   {
-        //     href: "https://github.com/lukebelliveau/",
-        //     label: "My GitHub",
-        //     position: "right",
-        //   },
-        // ],
+        items: [
+          // { to: "/blog", label: "Blog", position: "left" },
+          {
+            href: "https://github.com/lukebelliveau/",
+            label: "My GitHub",
+            position: "right",
+          },
+        ],
       },
       // footer: {
       //   style: "dark",

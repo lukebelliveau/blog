@@ -1,11 +1,21 @@
 /*
  * Copyright (c) Facebook, Inc. and its affiliates.
  * shamelessly stolen from https://github.com/reactjs/reactjs.org/blob/e6dfdd34fe7d3fad76023f71538e7f2d76303542/beta/src/components/MDX/Sandpack/createFileMap.ts
+ * understanding helped by https://blog.logrocket.com/build-interactive-blog-with-react-sandpack/
  */
 
 import type { SandpackFile } from "@codesandbox/sandpack-react";
+import React from "react";
 
-export const createFileMap = (codeSnippets: any) => {
+export const createFileMap = (
+  children: JSX.Element
+): Record<string, SandpackFile> => {
+  // convert the children to an array
+  let codeSnippets = React.Children.toArray(children) as React.ReactElement[];
+
+  // using the array.reduce method to reduce the children to an object containing
+  // filename as key then other properties like the code, if the file is hidden as
+  // properties
   return codeSnippets.reduce(
     (result: Record<string, SandpackFile>, codeSnippet: React.ReactElement) => {
       if (codeSnippet.props.mdxType !== "pre") {
@@ -17,6 +27,7 @@ export const createFileMap = (codeSnippets: any) => {
       let fileActive = false; // if the file tab is shown by default
 
       if (props.metastring) {
+        // get our metadata from the prop
         const [name, ...params] = props.metastring.split(" ");
         filePath = "/" + name;
         if (params.includes("hidden")) {
@@ -26,6 +37,8 @@ export const createFileMap = (codeSnippets: any) => {
           fileActive = true;
         }
       } else {
+        // if no name is given to the file, we give them defaults based on the language
+        // (<Sandpack /> has a default file it will look for if none given in `files` prop)
         if (props.className === "language-js") {
           filePath = "/App.js";
         } else if (props.className === "language-ts") {

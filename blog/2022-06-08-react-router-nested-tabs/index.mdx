@@ -16,7 +16,7 @@ Before the v6-style nested layouts, I was passing the tab route to a `TabbedLayo
 was in charge of rendering the layout, and choosing which tab content component to render. As you can see, it's convenient to provide the `:selectedTab` parameter to
 `TabbedLayout`, as it needs to know which tab is currently selected so it can highlight the correct tab:
 
-<SandpackSnippet dependencies={{
+<SandpackEditor dependencies={{
   "react-router-dom": "latest",
   "@mui/material": "latest",
   "@emotion/styled": "latest",
@@ -116,7 +116,7 @@ export default function App() {
 }
 ```
 
-</SandpackSnippet>
+</SandpackEditor>
 
 <!--truncate-->
 
@@ -152,7 +152,7 @@ Of course, we could just pass the `:selectedTab` URL param as we did in the exam
 
 Basically, I have a component at a parent route (`TabbedLayout` at route `"/*`)
 that needs to know if its child routes are active or not. I started by manually parsing the
-`location` object returned from React Router's `useLocation` hook, but this felt a bit hacky.
+`location` object returned from React Router's `useLocation` Hook, but this felt a bit hacky.
 There is a better way!
 
 _Note: this is a special case as we're using MUI's Tab components. If you just need a Link
@@ -160,7 +160,7 @@ to know if it's currently active or not, check out React Router's [`NavLink`](ht
 
 ## `useMatch` to the rescue!
 
-It turns out you can use React Router's `useMatch` hook to see if the location we are currently at
+It turns out you can use React Router's `useMatch` Hook to see if the location we are currently at
 matches a given path. Here's a crude use of it to determine which child route we're at, if any:
 
 ```tsx
@@ -210,7 +210,7 @@ const TabbedLayout = () => {
 };
 ```
 
-With a tiny wrapper function around the `useMatch` hook, we can make this a bit more concise:
+With a tiny wrapper function around the `useMatch` Hook, we can make this a bit more concise:
 
 ```tsx
 function useRouteMatch(patterns: readonly string[]) {
@@ -244,7 +244,7 @@ const TabbedLayout = () => {
 When taken all together, this pattern can make it really easy to group your components
 with their paths and get the router to do the work for you. Play around with it here:
 
-<SandpackSnippet
+<SandpackEditor
   dependencies={{
     "react-router-dom": "latest",
     "@mui/material": "latest",
@@ -364,4 +364,4 @@ export default () => {
 };
 ```
 
-</SandpackSnippet>
+</SandpackEditor>
