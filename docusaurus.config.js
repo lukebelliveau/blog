@@ -118,7 +118,7 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
-      image: "https://github.com/lukebelliveau.png",
+      // image: "https://github.com/lukebelliveau.png",
     }),
 };
 
